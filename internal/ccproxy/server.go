@@ -248,7 +248,8 @@ func (s *Server) handleProxy(c *gin.Context) {
 	// 调试详情：在 handler 全程更新同一个 map，requestLogger 返回后读取。
 	detail := map[string]any{
 		"inboundHeaders": headerToMap(c.Request.Header),
-		"reqBody":        parseBodyForLog(transformed, 32*1024),
+		"reqBody":        parseBodyForLog(transformed, 0),
+		"reqBodyBytes":   len(transformed),
 	}
 	c.Set("proxyDetail", detail)
 
@@ -291,7 +292,10 @@ func (s *Server) handleProxy(c *gin.Context) {
 					"retryAfter": resp.Header.Get("Retry-After"),
 					"delayMs":    delay.Milliseconds(),
 				})
-				s.streamResponse(c, resp)
+				detail["respHeaders"] = headerToMap(resp.Header)
+				c.Set("proxyAttempt", attempt)
+				c.Set("proxyUpstreamStatus", resp.StatusCode)
+				s.streamResponse(c, resp, detail)
 				return
 			}
 			s.onLog("warn", "rate limited, retrying", map[string]any{
@@ -326,7 +330,12 @@ func (s *Server) handleProxy(c *gin.Context) {
 				}
 			}
 
-			// 错误响应：剥前缀后透传给客户端
+			// 错误响应：剥前缀后透传给客户绰。同时记录 respBody 到 detail（原始 peek 结果，保留完整）。
+			detail["respHeaders"] = headerToMap(resp.Header)
+			detail["respBody"] = parseBodyForLog(peek, 0)
+			detail["respBodyBytes"] = len(peek)
+			c.Set("proxyAttempt", attempt)
+			c.Set("proxyUpstreamStatus", resp.StatusCode)
 			s.copyErrorResponse(c, resp, peek)
 			return
 		}
@@ -335,7 +344,7 @@ func (s *Server) handleProxy(c *gin.Context) {
 		detail["respHeaders"] = headerToMap(resp.Header)
 		c.Set("proxyAttempt", attempt)
 		c.Set("proxyUpstreamStatus", resp.StatusCode)
-		s.streamResponse(c, resp)
+		s.streamResponse(c, resp, detail)
 		return
 	}
 
@@ -424,7 +433,11 @@ func stainlessHeaders() map[string]string {
 //
 // 上游对 /v1/messages 默认返回 SSE（text/event-stream）。我们按 \n\n 切分事件，
 // 每个完整事件都过一遍 StripToolPrefix 再写到客户端。
-func (s *Server) streamResponse(c *gin.Context, resp *http.Response) {
+//
+// detail 不为 nil 时，还会边转发边把**剥前缀后**的完整响应字节另存一份到
+// detail["respBody"]/["respEvents"]，供前端调试面板展示。这里有个重要细节：
+// 记录的是“到达客户端”的响应（mcp_ 前缀已剥），跟客户端看到的一致。
+func (s *Server) streamResponse(c *gin.Context, resp *http.Response, detail map[string]any) {
 	defer resp.Body.Close()
 
 	// 透传 headers，但要剥离 content-length / content-encoding
@@ -446,6 +459,11 @@ func (s *Server) streamResponse(c *gin.Context, resp *http.Response) {
 
 	flusher, _ := c.Writer.(http.Flusher)
 
+	isSSE := isSSEResponse(resp.Header)
+
+	// 响应全量录下来供调试。不设上限 — 环形缓冲在上层控制总量。
+	var captured bytes.Buffer
+
 	buf := make([]byte, 16*1024)
 	var pending []byte
 	for {
@@ -461,9 +479,14 @@ func (s *Server) streamResponse(c *gin.Context, resp *http.Response) {
 				}
 				event := pending[:idx+2]
 				pending = pending[idx+2:]
-				if _, err := c.Writer.Write(StripToolPrefix(event)); err != nil {
+				stripped := StripToolPrefix(event)
+				if _, err := c.Writer.Write(stripped); err != nil {
+					// 客户端推失败：收尾 detail 之后退出
+					captured.Write(stripped)
+					flushCaptureToDetail(detail, captured.Bytes(), isSSE)
 					return
 				}
+				captured.Write(stripped)
 				if flusher != nil {
 					flusher.Flush()
 				}
@@ -472,17 +495,37 @@ func (s *Server) streamResponse(c *gin.Context, resp *http.Response) {
 		if readErr != nil {
 			// 收尾：剩余不到一个事件的内容也要写出
 			if len(pending) > 0 {
-				c.Writer.Write(StripToolPrefix(pending))
+				stripped := StripToolPrefix(pending)
+				c.Writer.Write(stripped)
+				captured.Write(stripped)
 				if flusher != nil {
 					flusher.Flush()
 				}
 			}
+			flushCaptureToDetail(detail, captured.Bytes(), isSSE)
 			if !errors.Is(readErr, io.EOF) {
 				s.onLog("warn", "upstream stream error", map[string]any{"error": readErr.Error()})
 			}
 			return
 		}
 	}
+}
+
+// flushCaptureToDetail 把已捕获的响应字节写入 detail map。
+//
+//   - SSE 流：同时写入 respEvents（结构化事件列表）和 respBodyRaw（完整原文）
+//   - 非 SSE：写入 respBody（如能解析为 JSON 则结构化）
+func flushCaptureToDetail(detail map[string]any, captured []byte, isSSE bool) {
+	if detail == nil || len(captured) == 0 {
+		return
+	}
+	detail["respBodyBytes"] = len(captured)
+	if isSSE {
+		detail["respEvents"] = parseSSEEvents(captured)
+		detail["respBodyRaw"] = string(captured)
+		return
+	}
+	detail["respBody"] = parseBodyForLog(captured, 0)
 }
 
 // copyErrorResponse 把已经 peek 过的错误响应转发给客户端（同样剥 mcp_ 前缀）。
@@ -553,47 +596,102 @@ func redactedHeaderToMap(h http.Header) map[string]string {
 	return result
 }
 
-// parseBodyForLog 把原始 body 解析为 JSON 并做智能截断；
-// 解析失败则返回截断的字符串；超过 maxBytes 直接返回占位说明。
+// parseBodyForLog 把原始 body 完整保留下来供前端调试。
+//
+// 策略（用户要求 "保证 body 数据完整保留"）：
+//   - 空 body 返回 nil
+//   - 能解析为 JSON → 返回解析后的对象（前端会用 JSON.stringify 美化展示）
+//   - 不能解析 → 返回原始字符串
+//
+// 不再做大小截断。代理日志缓冲区是环形（500 条上限），
+// 单条 100KB 量级的 body 完全可承受；调试时缺数据比内存压力更难受。
+//
+// maxBytes 参数保留是为了兼容旧调用，传 <=0 表示不限制。
 func parseBodyForLog(body []byte, maxBytes int) any {
+	_ = maxBytes // 已废弃，保留签名兼容；如需重新启用上限直接走该参数
 	if len(body) == 0 {
 		return nil
 	}
-	if len(body) > maxBytes {
-		return "[body too large: " + strconv.Itoa(len(body)) + " bytes, not captured]"
-	}
 	var v any
 	if err := json.Unmarshal(body, &v); err == nil {
-		return smartTruncate(v, 400)
-	}
-	s := string(body)
-	if len(s) > 400 {
-		return s[:400] + "…[+" + strconv.Itoa(len(s)-400) + " chars]"
-	}
-	return s
-}
-
-// smartTruncate 递归遍历 JSON 解析后的结构，把超长字符串截断。
-func smartTruncate(v any, maxStr int) any {
-	switch val := v.(type) {
-	case string:
-		if len(val) > maxStr {
-			return val[:maxStr] + "…[+" + strconv.Itoa(len(val)-maxStr) + " chars]"
-		}
-		return val
-	case map[string]any:
-		result := make(map[string]any, len(val))
-		for k, vv := range val {
-			result[k] = smartTruncate(vv, maxStr)
-		}
-		return result
-	case []any:
-		result := make([]any, len(val))
-		for i, vv := range val {
-			result[i] = smartTruncate(vv, maxStr)
-		}
-		return result
-	default:
 		return v
 	}
+	return string(body)
+}
+
+// sseEventSummary 是单条 SSE 事件的结构化摘要。
+//
+// 字段说明：
+//   - Event: SSE event 类型行（message_start / content_block_delta / ...）
+//   - Data:  data: 行解析后的 JSON 对象；解析失败保留原文字符串
+//
+// 为了保留全部信息，Data 不做任何字段截断；如果一条对话产生 2000 个 text_delta，
+// 那就老老实实存 2000 条。环形缓冲限制了总条数，单条对话不会撑爆。
+type sseEventSummary struct {
+	Event string `json:"event"`
+	Data  any    `json:"data"`
+}
+
+// parseSSEEvents 把 SSE 字节流（已按 \n\n 切分为完整事件块的拼接）解析成结构化事件列表。
+//
+// 输入是若干个事件块拼接，每块形如：
+//
+//	event: content_block_delta\ndata: {"type":"content_block_delta",...}\n\n
+//
+// 没有 event: 行的注释行（如 :ping）也会作为一条 "comment" 事件保留下来。
+func parseSSEEvents(raw []byte) []sseEventSummary {
+	if len(raw) == 0 {
+		return nil
+	}
+	chunks := bytes.Split(raw, []byte("\n\n"))
+	events := make([]sseEventSummary, 0, len(chunks))
+	for _, chunk := range chunks {
+		chunk = bytes.TrimRight(chunk, "\r\n")
+		if len(chunk) == 0 {
+			continue
+		}
+		var eventName string
+		var dataLines [][]byte
+		var comments []string
+		for _, line := range bytes.Split(chunk, []byte("\n")) {
+			line = bytes.TrimRight(line, "\r")
+			if len(line) == 0 {
+				continue
+			}
+			if line[0] == ':' {
+				comments = append(comments, string(line[1:]))
+				continue
+			}
+			if bytes.HasPrefix(line, []byte("event:")) {
+				eventName = strings.TrimSpace(string(line[len("event:"):]))
+				continue
+			}
+			if bytes.HasPrefix(line, []byte("data:")) {
+				dataLines = append(dataLines, bytes.TrimPrefix(bytes.TrimSpace(line[len("data:"):]), []byte(" ")))
+				continue
+			}
+			// 其他未知行原样作为 raw 行保留
+			comments = append(comments, string(line))
+		}
+
+		if len(dataLines) > 0 {
+			joined := bytes.Join(dataLines, []byte("\n"))
+			var parsed any
+			var data any
+			if err := json.Unmarshal(joined, &parsed); err == nil {
+				data = parsed
+			} else {
+				data = string(joined)
+			}
+			events = append(events, sseEventSummary{Event: eventName, Data: data})
+		} else if len(comments) > 0 {
+			events = append(events, sseEventSummary{Event: "comment", Data: strings.Join(comments, "\n")})
+		}
+	}
+	return events
+}
+
+// isSSEResponse 通过 content-type 判断响应是否为 SSE 流。
+func isSSEResponse(h http.Header) bool {
+	return strings.Contains(strings.ToLower(h.Get("Content-Type")), "text/event-stream")
 }

@@ -738,6 +738,55 @@ code {
   padding: 4px 2px;
 }
 
+/* ---- SSE 事件序列 ---- */
+.log-detail-events {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 480px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.log-detail-event {
+  border: 1px solid var(--bd-soft);
+  border-radius: var(--radius-sm);
+  background: #0a0c12;
+  overflow: hidden;
+}
+
+.log-detail-event__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  background: #10131c;
+  border-bottom: 1px solid var(--bd-soft);
+}
+
+.log-detail-event__idx {
+  font-size: 0.65rem;
+  color: var(--fg-faint);
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  min-width: 32px;
+}
+
+.log-detail-event__name {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #f0a87a;
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+.log-detail-event__data {
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  max-height: 220px;
+}
+
 /* 刷新按钮的旋转动画 */
 @keyframes spin {
   from {

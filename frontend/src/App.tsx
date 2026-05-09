@@ -76,6 +76,9 @@ const SECTION_LABELS: Record<string, string> = {
   upstreamReqHeaders: "转发请求头（代理 → Anthropic）",
   reqBody: "转发请求体",
   respHeaders: "上游响应头（Anthropic → 代理）",
+  respEvents: "上游响应 SSE 事件序列",
+  respBody: "上游响应体（非 SSE）",
+  respBodyRaw: "上游响应原始文本（SSE）",
 };
 
 const SECTION_ORDER = [
@@ -83,6 +86,9 @@ const SECTION_ORDER = [
   "upstreamReqHeaders",
   "reqBody",
   "respHeaders",
+  "respEvents",
+  "respBody",
+  "respBodyRaw",
 ];
 
 const BASIC_FIELDS_ORDER = [
@@ -93,6 +99,8 @@ const BASIC_FIELDS_ORDER = [
   "upstreamStatus",
   "duration",
   "attempt",
+  "reqBodyBytes",
+  "respBodyBytes",
 ];
 
 // 按预设顺序排序字段，未列出的按字母顺序在后
@@ -110,15 +118,47 @@ function sortByPreferred(
   });
 }
 
-// 分区内容渲染：reqBody 走代码块，headers 走键值表格
+// 分区内容渲染：
+//   - reqBody/respBody：JSON 代码块
+//   - respEvents：SSE 事件列表，逐条展开（event 名 + data 代码块）
+//   - respBodyRaw：原始文本代码块
+//   - headers：键值表格
 function SectionContent({ name, value }: { name: string; value: unknown }) {
   // 处理空 / null
   if (value === null || value === undefined) {
     return <div className="log-detail-empty">(空)</div>;
   }
 
-  // 请求体：JSON 代码块（后端已做智能截断）
-  if (name === "reqBody") {
+  // SSE 事件列表：逐条展开，每条 event 名高亮 + data JSON 块
+  if (name === "respEvents" && Array.isArray(value)) {
+    if (value.length === 0) {
+      return <div className="log-detail-empty">(无事件)</div>;
+    }
+    return (
+      <div className="log-detail-events">
+        {value.map((evt, i) => {
+          const ev = evt as { event?: string; data?: unknown };
+          const evName = ev.event || "(unnamed)";
+          return (
+            <div key={i} className="log-detail-event">
+              <div className="log-detail-event__head">
+                <span className="log-detail-event__idx">#{i + 1}</span>
+                <span className="log-detail-event__name">{evName}</span>
+              </div>
+              <pre className="log-detail-code log-detail-event__data">
+                {typeof ev.data === "string"
+                  ? ev.data
+                  : JSON.stringify(ev.data, null, 2)}
+              </pre>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // 请求体 / 响应体 / 原始文本：JSON 代码块
+  if (name === "reqBody" || name === "respBody" || name === "respBodyRaw") {
     if (typeof value === "string") {
       return <pre className="log-detail-code">{value}</pre>;
     }
@@ -155,10 +195,13 @@ function SectionContent({ name, value }: { name: string; value: unknown }) {
   );
 }
 
-// 为分区提供“概要”（项数 / 字符数），显示在折叠标题右侧
+// 为分区提供“概要”（项数 / 字符数 / 事件数），显示在折叠标题右侧
 function sectionSummary(name: string, value: unknown): string {
   if (value === null || value === undefined) return "";
-  if (name === "reqBody") {
+  if (name === "respEvents" && Array.isArray(value)) {
+    return `${value.length} 事件`;
+  }
+  if (name === "reqBody" || name === "respBody" || name === "respBodyRaw") {
     if (typeof value === "string") return `${value.length} chars`;
     try {
       return `${JSON.stringify(value).length} chars`;
