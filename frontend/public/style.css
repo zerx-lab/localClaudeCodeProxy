@@ -610,11 +610,15 @@ code {
 }
 
 /* ── 可折叠分区（请求头 / 响应头 / 请求体） ── */
+/* 注意：这里不要加 overflow:hidden。
+   .log-detail 是 display:flex column，section 作为 flex 子项时
+   叠加 overflow:hidden 会在 <details open> 内容很长时让外层 .log-pane
+   的滚动失效（撑不到 content 高度）。
+   summary 的 hover 背景靠下面的 border-radius 单独处理，不依赖父级裁切。 */
 .log-detail-section {
   background: rgba(255, 255, 255, 0.025);
   border: 1px solid var(--bd-soft);
   border-radius: var(--radius-sm);
-  overflow: hidden;
 }
 
 .log-detail-section[open] {
@@ -633,6 +637,13 @@ code {
   user-select: none;
   list-style: none;
   transition: background 100ms ease;
+  /* 折叠态：四角圆，跟 section 同步 */
+  border-radius: calc(var(--radius-sm) - 1px);
+}
+
+/* 展开态：只圆上面两角，下沿与 body 平齐 */
+.log-detail-section[open] .log-detail-section__title {
+  border-radius: calc(var(--radius-sm) - 1px) calc(var(--radius-sm) - 1px) 0 0;
 }
 
 /* 干掉原生 marker 三角 */
@@ -681,6 +692,8 @@ code {
 .log-detail-section__body {
   padding: 6px 10px 10px;
   border-top: 1px solid var(--bd-soft);
+  /* 与父 section 圆角同步：下两角圆，上两角直 */
+  border-radius: 0 0 calc(var(--radius-sm) - 1px) calc(var(--radius-sm) - 1px);
   cursor: text;
 }
 
