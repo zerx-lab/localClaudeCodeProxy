@@ -1,0 +1,1104 @@
+/* localClaudeCodeProxy — 全局样式
+ *
+ * 颜色变量集中在 :root，所有组件通过 var(--xxx) 引用，方便后续切主题。
+ * 主要语义：
+ *   --bg-*    页面/卡片背景
+ *   --fg-*    文本颜色
+ *   --bd-*    边框 / 分隔线
+ *   --ac-*    强调色（蓝、绿、红、黄）
+ *   --sh-*    阴影（用 rgba 写死，避免变量嵌套兼容性）
+ */
+
+:root {
+  /* === Colours === */
+  --bg-app: #0f1117;
+  --bg-app-grad: linear-gradient(180deg, #0f1117 0%, #14161e 100%);
+  --bg-card: #181b24;
+  --bg-card-hi: #1d2029;
+  --bg-input: #11131a;
+  --bg-titlebar: rgba(15, 17, 23, 0.85);
+
+  --fg-strong: #eef0f5;
+  --fg-default: #d2d6e0;
+  --fg-muted: #8a93a6;
+  --fg-faint: #5b6478;
+
+  --bd-soft: rgba(255, 255, 255, 0.06);
+  --bd-default: rgba(255, 255, 255, 0.09);
+  --bd-strong: rgba(255, 255, 255, 0.18);
+
+  --ac-blue: #4f8bf5;
+  --ac-blue-hi: #6da2ff;
+  --ac-green: #4ade80;
+  --ac-red: #f87171;
+  --ac-amber: #fbbf24;
+
+  --titlebar-h: 36px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+
+  font-family:
+    "Inter",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    "Roboto",
+    "Helvetica Neue",
+    sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color-scheme: dark;
+  color: var(--fg-default);
+  background-color: var(--bg-app);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 400;
+  src:
+    local(""),
+    url("./Inter-Medium.ttf") format("truetype");
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg-app-grad);
+  overflow: hidden; /* 滚动条留给内部 .app */
+}
+
+/* === 顶层布局：titlebar 固定 + 内容区可滚动 === */
+.root {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+}
+
+/* === Titlebar === */
+.titlebar {
+  flex: 0 0 var(--titlebar-h);
+  height: var(--titlebar-h);
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  background: var(--bg-titlebar);
+  backdrop-filter: blur(20px) saturate(120%);
+  -webkit-backdrop-filter: blur(20px) saturate(120%);
+  border-bottom: 1px solid var(--bd-soft);
+  font-size: 0.78rem;
+  color: var(--fg-default);
+  letter-spacing: 0.2px;
+  position: relative;
+  z-index: 10;
+  user-select: none;
+}
+
+/* macOS 下原生红绿灯按钮浮在内容左上角，让出 80px 避让 */
+.titlebar--mac .titlebar__left {
+  padding-left: 80px;
+}
+
+.titlebar--win .titlebar__left {
+  padding-left: 12px;
+}
+
+.titlebar__left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.titlebar__logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  color: var(--ac-blue-hi);
+  flex: 0 0 auto;
+}
+
+.titlebar__title {
+  font-weight: 600;
+  color: var(--fg-strong);
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.titlebar__right {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.titlebar__extra {
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+}
+
+.titlebar__controls {
+  display: flex;
+  align-items: stretch;
+  margin-left: 4px;
+}
+
+.titlebar__btn {
+  width: 46px;
+  height: var(--titlebar-h);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--fg-muted);
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
+  border-radius: 0; /* titlebar 控件不要圆角 */
+  padding: 0;
+  font: inherit;
+  -webkit-app-region: no-drag;
+}
+
+.titlebar__btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--fg-strong);
+}
+
+.titlebar__btn:active {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.titlebar__btn--close:hover {
+  background: #e81123;
+  color: #fff;
+}
+
+.titlebar__btn--close:active {
+  background: #c30f1f;
+}
+
+/* === 主内容区 ===
+ *
+ * 单列（compact/normal）：flex-column，.col 用 display:contents 透明化，
+ *   卡片直接参与 flex 间距，不引入多余层级。
+ * 双栏（wide ≥840px）：CSS Grid，.col 变为实体容器，右列日志常驻展开。
+ */
+.app {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px 24px 28px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* 单列时 .col 对 flex 透明 —— 卡片直接成为 .app 的 flex 子项 */
+.col {
+  display: contents;
+}
+
+/* === Badge === */
+.badge {
+  --badge-color: var(--fg-muted);
+  --badge-bg: rgba(148, 163, 184, 0.14);
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--badge-bg);
+  color: var(--badge-color);
+  border: 1px solid transparent;
+}
+
+.badge::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 0 currentColor;
+}
+
+.badge.running {
+  --badge-color: var(--ac-green);
+  --badge-bg: rgba(74, 222, 128, 0.12);
+}
+
+.badge.running::before {
+  animation: badge-pulse 1.6s ease-out infinite;
+}
+
+.badge.stopped {
+  --badge-color: var(--fg-muted);
+  --badge-bg: rgba(148, 163, 184, 0.12);
+}
+
+.badge.error {
+  --badge-color: var(--ac-red);
+  --badge-bg: rgba(248, 113, 113, 0.14);
+}
+
+@keyframes badge-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.6);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(74, 222, 128, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(74, 222, 128, 0);
+  }
+}
+
+/* === Cards === */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--bd-soft);
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.03) inset,
+    0 8px 24px rgba(0, 0, 0, 0.25);
+  transition:
+    border-color 160ms ease,
+    transform 160ms ease;
+}
+
+.card-title {
+  font-size: 0.74rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--fg-muted);
+  margin: 0 0 2px;
+}
+
+/* === Rows === */
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.row > label {
+  flex: 0 0 80px;
+  color: var(--fg-muted);
+  font-size: 0.83rem;
+}
+
+.row .value {
+  flex: 1;
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.82rem;
+  color: var(--fg-default);
+  word-break: break-all;
+  user-select: text;
+}
+
+/* === Inputs === */
+input[type="number"],
+input[type="text"],
+select {
+  background: var(--bg-input);
+  border: 1px solid var(--bd-default);
+  color: var(--fg-strong);
+  padding: 7px 11px;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  outline: none;
+  font-family: inherit;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    background 140ms ease;
+}
+
+input[type="number"]:hover:not(:disabled),
+input[type="text"]:hover:not(:disabled),
+select:hover:not(:disabled) {
+  border-color: var(--bd-strong);
+}
+
+input[type="number"]:focus,
+input[type="text"]:focus,
+select:focus {
+  border-color: var(--ac-blue);
+  box-shadow: 0 0 0 3px rgba(79, 139, 245, 0.18);
+}
+
+input:disabled,
+select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+input[type="number"] {
+  width: 110px;
+}
+
+/* === Buttons === */
+button {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--fg-strong);
+  border: 1px solid var(--bd-default);
+  padding: 7px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    transform 80ms ease;
+  font-family: inherit;
+  min-height: 30px;
+}
+
+button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--bd-strong);
+}
+
+button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+button.primary {
+  background: linear-gradient(180deg, #4f8bf5 0%, #356de6 100%);
+  border-color: #2c61d4;
+  color: #ffffff;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.15) inset,
+    0 4px 14px rgba(53, 109, 230, 0.35);
+}
+
+button.primary:hover:not(:disabled) {
+  background: linear-gradient(180deg, #5d97f8 0%, #4079ec 100%);
+  border-color: #3066d6;
+}
+
+button.danger {
+  background: linear-gradient(180deg, #e94c4c 0%, #c53030 100%);
+  border-color: #a92424;
+  color: #ffffff;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.12) inset,
+    0 4px 14px rgba(197, 48, 48, 0.3);
+}
+
+button.danger:hover:not(:disabled) {
+  background: linear-gradient(180deg, #f15a5a 0%, #d23b3b 100%);
+}
+
+/* === Banner / Help === */
+.error-banner {
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.32);
+  color: #fca5a5;
+  font-size: 0.82rem;
+}
+
+.help {
+  font-size: 0.78rem;
+  color: var(--fg-muted);
+  line-height: 1.6;
+}
+
+.help code,
+code {
+  background: var(--bg-input);
+  padding: 1px 7px;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  color: var(--fg-default);
+  user-select: text;
+  border: 1px solid var(--bd-soft);
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+/* === Log pane === */
+.log-pane {
+  background: #0a0c12;
+  border: 1px solid var(--bd-soft);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  height: 260px;
+  overflow-y: auto;
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.75rem;
+  line-height: 1.6;
+  user-select: text;
+}
+
+.log-pane .empty {
+  color: var(--fg-faint);
+  font-style: italic;
+}
+
+/* 每条日志的外层包裹（主行 + 可展开的详情面板） */
+.log-entry {
+  display: flex;
+  flex-direction: column;
+}
+
+.log-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 2px 4px;
+  border-radius: 3px;
+  transition: background 80ms ease;
+}
+
+/* 有详情可展开时显示手形指针 */
+.log-line.has-detail {
+  cursor: pointer;
+}
+
+.log-line.has-detail:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.log-line.is-open {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.log-line .ts {
+  color: var(--fg-faint);
+  flex: 0 0 auto;
+}
+
+.log-line .lv {
+  font-weight: 600;
+  flex: 0 0 50px;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+}
+
+.log-line.debug .lv {
+  color: var(--fg-faint);
+}
+.log-line.info .lv {
+  color: var(--ac-blue-hi);
+}
+.log-line.warn .lv {
+  color: var(--ac-amber);
+}
+.log-line.error .lv {
+  color: var(--ac-red);
+}
+
+.log-line .msg {
+  flex: 1;
+  color: var(--fg-default);
+  word-break: break-word;
+}
+
+/* 展开/收起指示符号 */
+.detail-toggle {
+  flex: 0 0 auto;
+  color: var(--fg-faint);
+  font-size: 0.6rem;
+  margin-left: auto;
+  padding-left: 6px;
+  transition: color 120ms ease;
+}
+
+.log-line.has-detail:hover .detail-toggle,
+.log-line.is-open .detail-toggle {
+  color: var(--ac-blue-hi);
+}
+
+/* 详情面板：展开时展示在主行下方 */
+.log-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 2px 0 8px 12px;
+  padding: 8px 10px 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border-left: 2px solid var(--bd-default);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  animation: detail-slide-in 120ms ease;
+}
+
+@keyframes detail-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 基本字段区（method/path/status…） */
+.log-detail-basic {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px 2px 4px;
+}
+
+.log-detail-row {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+.log-detail-key {
+  flex: 0 0 120px;
+  color: var(--fg-muted);
+  text-align: right;
+  word-break: break-word;
+}
+
+.log-detail-val {
+  flex: 1;
+  color: var(--fg-default);
+  word-break: break-all;
+  user-select: text;
+  min-width: 0;
+}
+
+/* ── 可折叠分区（请求头 / 响应头 / 请求体） ── */
+.log-detail-section {
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid var(--bd-soft);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.log-detail-section[open] {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: var(--bd-default);
+}
+
+.log-detail-section__title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  cursor: pointer;
+  font-size: 0.72rem;
+  color: var(--fg-default);
+  user-select: none;
+  list-style: none;
+  transition: background 100ms ease;
+}
+
+/* 干掉原生 marker 三角 */
+.log-detail-section__title::-webkit-details-marker {
+  display: none;
+}
+.log-detail-section__title::marker {
+  display: none;
+  content: "";
+}
+
+.log-detail-section__title:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.log-detail-section__chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  flex: 0 0 12px;
+  font-size: 0.7rem;
+  color: var(--fg-faint);
+  transition: transform 160ms ease;
+}
+
+.log-detail-section[open] .log-detail-section__chevron {
+  transform: rotate(90deg);
+  color: var(--ac-blue-hi);
+}
+
+.log-detail-section__label {
+  flex: 1;
+  font-weight: 500;
+  color: var(--fg-strong);
+}
+
+.log-detail-section__summary {
+  font-size: 0.7rem;
+  color: var(--fg-faint);
+  font-variant-numeric: tabular-nums;
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+.log-detail-section__body {
+  padding: 6px 10px 10px;
+  border-top: 1px solid var(--bd-soft);
+  cursor: text;
+}
+
+/* ── headers 表格样式 ── */
+.log-detail-headers {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.log-detail-row--header {
+  font-size: 0.7rem;
+  line-height: 1.55;
+  padding: 1px 0;
+}
+
+.log-detail-key--header {
+  flex: 0 0 200px;
+  color: var(--ac-blue-hi);
+  text-align: left;
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  word-break: break-all;
+}
+
+.log-detail-val--header {
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  color: var(--fg-default);
+}
+
+/* ── 请求体代码块 ── */
+.log-detail-code {
+  margin: 0;
+  padding: 8px 10px;
+  background: #07080d;
+  border: 1px solid var(--bd-soft);
+  border-radius: var(--radius-sm);
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.7rem;
+  line-height: 1.55;
+  color: #cfd5e3;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 320px;
+  overflow: auto;
+  user-select: text;
+}
+
+.log-detail-empty {
+  font-size: 0.7rem;
+  color: var(--fg-faint);
+  font-style: italic;
+  padding: 4px 2px;
+}
+
+/* 刷新按钮的旋转动画 */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spin {
+  animation: spin 0.7s linear infinite;
+  display: inline-block;
+}
+
+/* === Toggle switch ===
+ * 用 input[type=checkbox] + 兄弟选择器渲染滑块；checkbox 视觉隐藏但保留可达性。
+ */
+.toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  cursor: pointer;
+  padding: 4px 0;
+  user-select: none;
+}
+
+.toggle--disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.toggle input {
+  /* 视觉隐藏，但仍可被键盘聚焦 */
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  clip: rect(0 0 0 0);
+  overflow: hidden;
+  border: 0;
+  white-space: nowrap;
+}
+
+.toggle__track {
+  flex: 0 0 36px;
+  width: 36px;
+  height: 20px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--bd-default);
+  position: relative;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease;
+  margin-top: 2px;
+}
+
+.toggle__thumb {
+  position: absolute;
+  top: 50%;
+  left: 2px;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #c2c8d6;
+  transition:
+    left 180ms cubic-bezier(0.4, 0.2, 0.2, 1),
+    background 160ms ease,
+    box-shadow 160ms ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+.toggle input:checked + .toggle__track {
+  background: rgba(79, 139, 245, 0.55);
+  border-color: var(--ac-blue);
+}
+
+.toggle input:checked + .toggle__track .toggle__thumb {
+  left: 18px;
+  background: #ffffff;
+  box-shadow: 0 1px 4px rgba(79, 139, 245, 0.5);
+}
+
+.toggle input:focus-visible + .toggle__track {
+  box-shadow: 0 0 0 3px rgba(79, 139, 245, 0.3);
+}
+
+.toggle__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.toggle__label {
+  font-size: 0.85rem;
+  color: var(--fg-strong);
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.toggle__hint {
+  font-size: 0.74rem;
+  color: var(--fg-muted);
+  line-height: 1.45;
+}
+
+/* === Collapsible card === */
+.card--collapsible {
+  /* 折叠态时 padding 减少，让 header 更紧凑 */
+  padding: 8px 14px 8px 10px;
+  gap: 0;
+  transition: padding 160ms ease;
+}
+
+.card--collapsible.is-open {
+  padding: 14px 18px 16px;
+  gap: 12px;
+}
+
+.collapsible__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.collapsible__toggle {
+  flex: 1 1 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: none;
+  padding: 4px 6px;
+  cursor: pointer;
+  color: var(--fg-default);
+  border-radius: var(--radius-sm);
+  transition: background 120ms ease;
+  text-align: left;
+  min-height: 28px;
+}
+
+.collapsible__toggle:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.collapsible__toggle .card-title {
+  margin: 0;
+}
+
+.collapsible__chevron {
+  color: var(--fg-muted);
+  flex: 0 0 12px;
+  transition: transform 180ms ease;
+}
+
+.card--collapsible.is-open .collapsible__chevron {
+  transform: rotate(180deg);
+  color: var(--ac-blue-hi);
+}
+
+.collapsible__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--bd-soft);
+  font-size: 0.7rem;
+  color: var(--fg-muted);
+  font-variant-numeric: tabular-nums;
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+.collapsible__action {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  min-height: 26px;
+}
+
+/* === Scrollbar === */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.18);
+  background-clip: content-box;
+}
+
+/* ============================================================
+ * 响应式布局
+ *
+ * 三档断点：
+ *   compact : < 480px  — 紧凑单列
+ *   normal  : 480-839px — 默认（上方基础样式）
+ *   wide    : ≥ 840px  — 双栏
+ * ============================================================ */
+
+/* ── compact：紧凑单列 ─────────────────────────────────────────────── */
+@media (max-width: 479px) {
+  .app {
+    padding: 12px 14px 16px;
+    gap: 10px;
+  }
+
+  .card {
+    padding: 13px 14px;
+    gap: 10px;
+  }
+
+  /* 标签变成第一行小标题，表单内容顶格 */
+  .row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .row > label {
+    flex: none;
+    font-size: 0.78rem;
+  }
+
+  /* Toggle 隐藏次要提示文字，节省高度 */
+  .toggle__hint {
+    display: none;
+  }
+
+  /* 日志面板稍短 */
+  .log-pane {
+    height: 200px;
+  }
+
+  /* 按鈕稍小 */
+  button {
+    padding: 6px 12px;
+    font-size: 0.82rem;
+  }
+
+  /* 选择和输入全宽 */
+  input[type="number"],
+  select {
+    width: 100%;
+  }
+}
+
+/* ── normal：最大宽限制 (480–839px) ─────────────────────────────── */
+@media (min-width: 480px) and (max-width: 839px) {
+  .app {
+    max-width: 680px;
+  }
+}
+
+/* ── wide：双栏布局 (≥840px) ──────────────────────────────────────── */
+@media (min-width: 840px) {
+  /* .app 从 flex 切换为 2栏 Grid */
+  .app {
+    display: grid;
+    grid-template-columns: minmax(260px, 2fr) minmax(300px, 3fr);
+    grid-template-rows: 1fr;
+    column-gap: 18px;
+    row-gap: 0;
+    max-width: none;
+    /* 关闭外层滚动：左列内部滚动，右列滚动限于日志面板 */
+    overflow: hidden;
+    /* 占满 .root 剩余高度 */
+    flex: 1 1 0;
+    min-height: 0;
+    padding: 20px 28px 20px;
+    align-items: stretch;
+  }
+
+  /* 双栏模式下 .col 是实体容器 */
+  .col {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  /* 左列：内容可滚动 */
+  .col--main {
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-bottom: 20px;
+    /* 自定义滚动条不占宽度对内容布局的影响 */
+    scrollbar-gutter: stable;
+  }
+
+  /* 右列：日志卡充满全高 */
+  .col--side {
+    overflow: hidden;
+  }
+
+  /* 右列日志卡：充满列高 */
+  .col--side .card--logs {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    /* 宽屏下常驻展开，复用 is-open 的 padding */
+    padding: 14px 18px 16px;
+    gap: 12px;
+  }
+
+  /* 日志面板充满右列剩余高度 */
+  .col--side .log-pane {
+    flex: 1;
+    height: 0; /* flex 充满技巧 */
+    min-height: 120px;
+  }
+
+  /* 宽屏标题行不需要 collapsible 的紧凑 padding */
+  .col--side .card--collapsible {
+    padding: 14px 18px 16px !important;
+  }
+
+  /* 右列标题不可点击，直接为 div：统一样式 */
+  .collapsible__toggle--static {
+    flex: 1 1 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 6px;
+    cursor: default;
+    color: var(--fg-default);
+  }
+
+  /* 宽屏时造访设置的提示展示，节省空间 */
+  .toggle__hint {
+    font-size: 0.7rem;
+  }
+}
+
+/* ── 超宽：内边距更宽松 (≥ 1100px) ───────────────────────────── */
+@media (min-width: 1100px) {
+  .app {
+    padding: 24px 36px 24px;
+    column-gap: 24px;
+  }
+}
