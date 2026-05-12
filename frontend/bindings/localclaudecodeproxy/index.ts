@@ -7,7 +7,9 @@ export {
 };
 
 export {
+    AccountView,
     LogEntry,
+    ProviderInfo,
     ProxyStatus,
     SettingsInput,
     SettingsView

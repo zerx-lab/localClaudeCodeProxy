@@ -5,6 +5,50 @@
 // @ts-ignore: Unused imports
 import { Create as $Create } from "@wailsio/runtime";
 
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as time$0 from "../time/models.js";
+
+/**
+ * AccountView 是统一后的账户视图，避免前端依赖具体 internal 包类型。
+ */
+export class AccountView {
+    "provider": string;
+    "providerName": string;
+    "hasCredentials": boolean;
+    "authType"?: string;
+    "source"?: string;
+    "sourceLabel"?: string;
+    "accountId"?: string;
+    "email"?: string;
+    "subscription"?: string;
+    "expiresAt"?: time$0.Time;
+    "path"?: string;
+
+    /** Creates a new AccountView instance. */
+    constructor($$source: Partial<AccountView> = {}) {
+        if (!("provider" in $$source)) {
+            this["provider"] = "";
+        }
+        if (!("providerName" in $$source)) {
+            this["providerName"] = "";
+        }
+        if (!("hasCredentials" in $$source)) {
+            this["hasCredentials"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new AccountView instance from a string or object.
+     */
+    static createFrom($$source: any = {}): AccountView {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new AccountView($$parsedSource as Partial<AccountView>);
+    }
+}
+
 /**
  * LogEntry 是发送到前端的日志事件 payload。
  */
@@ -43,12 +87,54 @@ export class LogEntry {
 }
 
 /**
+ * ProviderInfo 是 UI provider 切换器需要的静态描述。
+ */
+export class ProviderInfo {
+    "id": string;
+    "name": string;
+    "shortName": string;
+    "description": string;
+    "protocol": string;
+
+    /** Creates a new ProviderInfo instance. */
+    constructor($$source: Partial<ProviderInfo> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = "";
+        }
+        if (!("name" in $$source)) {
+            this["name"] = "";
+        }
+        if (!("shortName" in $$source)) {
+            this["shortName"] = "";
+        }
+        if (!("description" in $$source)) {
+            this["description"] = "";
+        }
+        if (!("protocol" in $$source)) {
+            this["protocol"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ProviderInfo instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ProviderInfo {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new ProviderInfo($$parsedSource as Partial<ProviderInfo>);
+    }
+}
+
+/**
  * ProxyStatus 是 Status() 的返回结构，对应前端可读字段。
  */
 export class ProxyStatus {
     "running": boolean;
     "addr": string;
     "port": number;
+    "provider": string;
+    "providerName": string;
 
     /** Creates a new ProxyStatus instance. */
     constructor($$source: Partial<ProxyStatus> = {}) {
@@ -60,6 +146,12 @@ export class ProxyStatus {
         }
         if (!("port" in $$source)) {
             this["port"] = 0;
+        }
+        if (!("provider" in $$source)) {
+            this["provider"] = "";
+        }
+        if (!("providerName" in $$source)) {
+            this["providerName"] = "";
         }
 
         Object.assign(this, $$source);
@@ -81,6 +173,7 @@ export class SettingsInput {
     "autoStartProxy": boolean;
     "hideOnClose": boolean;
     "launchOnBoot": boolean;
+    "lastProvider": string;
     "lastHost": string;
     "lastPort": number;
 
@@ -94,6 +187,9 @@ export class SettingsInput {
         }
         if (!("launchOnBoot" in $$source)) {
             this["launchOnBoot"] = false;
+        }
+        if (!("lastProvider" in $$source)) {
+            this["lastProvider"] = "";
         }
         if (!("lastHost" in $$source)) {
             this["lastHost"] = "";
@@ -123,6 +219,7 @@ export class SettingsView {
     "autoStartProxy": boolean;
     "hideOnClose": boolean;
     "launchOnBoot": boolean;
+    "lastProvider": string;
     "lastHost": string;
     "lastPort": number;
     "launchOnBootSupported": boolean;
@@ -138,6 +235,9 @@ export class SettingsView {
         }
         if (!("launchOnBoot" in $$source)) {
             this["launchOnBoot"] = false;
+        }
+        if (!("lastProvider" in $$source)) {
+            this["lastProvider"] = "";
         }
         if (!("lastHost" in $$source)) {
             this["lastHost"] = "";

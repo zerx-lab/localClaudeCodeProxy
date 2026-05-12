@@ -8,7 +8,7 @@ info:
   companyName: "zerx-lab"
   productName: "localClaudeCodeProxy"
   productIdentifier: "com.zerxlab.localclaudecodeproxy"
-  description: "Local proxy that exposes Claude Code subscription as Anthropic-compatible HTTP API"
+  description: "Local proxy that exposes ChatGPT and Claude Code subscriptions as local HTTP APIs"
   copyright: "(c) 2026, zerx-lab"
   comments: "Wails3 + Go (gin) + React. Tray-resident desktop app."
   version: "0.1.0"

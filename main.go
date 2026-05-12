@@ -1,4 +1,4 @@
-// localClaudeCodeProxy 是基于 Wails3 的桌面应用，把本地 Claude Code 订阅暴露成本地 HTTP API。
+// localClaudeCodeProxy 是基于 Wails3 的桌面应用，把本地 ChatGPT / Claude Code 订阅暴露成本地 HTTP API。
 //
 // 关键设计：
 //   - **关闭主窗口不退出进程**：Mac.ApplicationShouldTerminateAfterLastWindowClosed = false，
@@ -30,7 +30,7 @@ func main() {
 	// 应用本身：关掉最后一个窗口不退出进程，只能从托盘 Quit。
 	app := application.New(application.Options{
 		Name:        "localClaudeCodeProxy",
-		Description: "Local proxy for Claude Code subscription",
+		Description: "Local proxy for ChatGPT and Claude Code subscriptions",
 		Mac: application.MacOptions{
 			ApplicationShouldTerminateAfterLastWindowClosed: false,
 		},
@@ -97,8 +97,8 @@ func main() {
 		if !proxySvc.AutoStartProxy() {
 			return
 		}
-		host, port := proxySvc.LastEndpoint()
-		if _, err := proxySvc.Start(host, port); err != nil {
+		provider, host, port := proxySvc.LastEndpoint()
+		if _, err := proxySvc.Start(provider, host, port); err != nil {
 			log.Printf("auto-start proxy failed: %v", err)
 		}
 	})

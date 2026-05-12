@@ -32,6 +32,11 @@ const fileName = "config.json"
 //
 // 注意：所有字段必须可被 zero-value 表示一个有意义的"默认"，否则 Load 老配置时会出现意外行为。
 type Settings struct {
+	// LastProvider 是上次选择的代理类型。当前支持：
+	//   - chatgpt: ChatGPT Plus/Pro -> OpenAI/Codex API
+	//   - claude:  Claude Code -> Anthropic API
+	LastProvider string `json:"lastProvider"`
+
 	// AutoStartProxy 为 true 时，应用启动后会自动用上次的 LastHost/LastPort 启动代理。
 	AutoStartProxy bool `json:"autoStartProxy"`
 
@@ -53,6 +58,7 @@ type Settings struct {
 // Default 返回开箱即用的默认值。
 func Default() Settings {
 	return Settings{
+		LastProvider:   "chatgpt",
 		AutoStartProxy: false,
 		HideOnClose:    true,
 		LaunchOnBoot:   false,
@@ -64,6 +70,9 @@ func Default() Settings {
 // applyDefaults 给从磁盘读出的配置补齐缺省值。
 // 例：旧版本配置没有 LastPort 字段，反序列化后 LastPort=0，需要补成 8765。
 func applyDefaults(s *Settings) {
+	if s.LastProvider == "" {
+		s.LastProvider = "chatgpt"
+	}
 	if s.LastHost == "" {
 		s.LastHost = "127.0.0.1"
 	}

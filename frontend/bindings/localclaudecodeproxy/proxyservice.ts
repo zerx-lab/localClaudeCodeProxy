@@ -12,20 +12,29 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import * as ccproxy$0 from "./internal/ccproxy/models.js";
+import * as chatgptproxy$0 from "./internal/chatgptproxy/models.js";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
 import * as $models from "./models.js";
 
 /**
- * Account 返回去敏后的账户信息（订阅类型 / 过期时间 / 文件路径）。
+ * Account 返回指定 provider 的去敏账户信息。
  * 
  * 前端用这个判断"凭证文件是否存在"以及展示"还有多少时间过期"。
  */
-export function Account(): $CancellablePromise<ccproxy$0.AccountInfo> {
-    return $Call.ByID(2725535856).then(($result: any) => {
+export function Account(provider: string): $CancellablePromise<$models.AccountView> {
+    return $Call.ByID(2725535856, provider).then(($result: any) => {
         return $$createType0($result);
+    });
+}
+
+/**
+ * Accounts 返回全部 provider 的账户状态。
+ */
+export function Accounts(): $CancellablePromise<$models.AccountView[]> {
+    return $Call.ByID(3224577209).then(($result: any) => {
+        return $$createType1($result);
     });
 }
 
@@ -51,7 +60,7 @@ export function ClearLogs(): $CancellablePromise<void> {
  */
 export function GetLogs(): $CancellablePromise<$models.LogEntry[]> {
     return $Call.ByID(1086591632).then(($result: any) => {
-        return $$createType2($result);
+        return $$createType3($result);
     });
 }
 
@@ -60,7 +69,7 @@ export function GetLogs(): $CancellablePromise<$models.LogEntry[]> {
  */
 export function GetSettings(): $CancellablePromise<$models.SettingsView> {
     return $Call.ByID(2106057390).then(($result: any) => {
-        return $$createType3($result);
+        return $$createType4($result);
     });
 }
 
@@ -74,10 +83,28 @@ export function HideOnClose(): $CancellablePromise<boolean> {
 }
 
 /**
- * LastEndpoint 返回上次启动时使用的 host / port，供 AutoStartProxy 复用。
+ * LastEndpoint 返回上次启动时使用的 provider / host / port，供 AutoStartProxy 复用。
  */
-export function LastEndpoint(): $CancellablePromise<[string, number]> {
+export function LastEndpoint(): $CancellablePromise<[string, string, number]> {
     return $Call.ByID(166054236);
+}
+
+/**
+ * LoginChatGPT 通过浏览器完成 OpenAI OAuth 登录，并把 token 保存到本应用配置目录。
+ */
+export function LoginChatGPT(): $CancellablePromise<chatgptproxy$0.LoginResult> {
+    return $Call.ByID(3704300873).then(($result: any) => {
+        return $$createType5($result);
+    });
+}
+
+/**
+ * Providers 返回 UI 可选的代理提供方。
+ */
+export function Providers(): $CancellablePromise<$models.ProviderInfo[]> {
+    return $Call.ByID(4237639281).then(($result: any) => {
+        return $$createType7($result);
+    });
 }
 
 /**
@@ -85,8 +112,8 @@ export function LastEndpoint(): $CancellablePromise<[string, number]> {
  * 
  * 返回的 AccountInfo 是刷新后的最新状态。
  */
-export function RefreshAccount(): $CancellablePromise<ccproxy$0.AccountInfo> {
-    return $Call.ByID(376514207).then(($result: any) => {
+export function RefreshAccount(provider: string): $CancellablePromise<$models.AccountView> {
+    return $Call.ByID(376514207, provider).then(($result: any) => {
         return $$createType0($result);
     });
 }
@@ -96,9 +123,9 @@ export function RefreshAccount(): $CancellablePromise<ccproxy$0.AccountInfo> {
  * 
  * host 默认 "127.0.0.1"，仅本机访问；前端如果允许暴露到局域网，可传 "0.0.0.0"。
  */
-export function Start(host: string, port: number): $CancellablePromise<$models.ProxyStatus> {
-    return $Call.ByID(361831395, host, port).then(($result: any) => {
-        return $$createType4($result);
+export function Start(provider: string, host: string, port: number): $CancellablePromise<$models.ProxyStatus> {
+    return $Call.ByID(361831395, provider, host, port).then(($result: any) => {
+        return $$createType8($result);
     });
 }
 
@@ -107,7 +134,7 @@ export function Start(host: string, port: number): $CancellablePromise<$models.P
  */
 export function Status(): $CancellablePromise<$models.ProxyStatus> {
     return $Call.ByID(4123605683).then(($result: any) => {
-        return $$createType4($result);
+        return $$createType8($result);
     });
 }
 
@@ -116,7 +143,7 @@ export function Status(): $CancellablePromise<$models.ProxyStatus> {
  */
 export function Stop(): $CancellablePromise<$models.ProxyStatus> {
     return $Call.ByID(2711506417).then(($result: any) => {
-        return $$createType4($result);
+        return $$createType8($result);
     });
 }
 
@@ -127,13 +154,17 @@ export function Stop(): $CancellablePromise<$models.ProxyStatus> {
  */
 export function UpdateSettings(input: $models.SettingsInput): $CancellablePromise<$models.SettingsView> {
     return $Call.ByID(2164540157, input).then(($result: any) => {
-        return $$createType3($result);
+        return $$createType4($result);
     });
 }
 
 // Private type creation functions
-const $$createType0 = ccproxy$0.AccountInfo.createFrom;
-const $$createType1 = $models.LogEntry.createFrom;
-const $$createType2 = $Create.Array($$createType1);
-const $$createType3 = $models.SettingsView.createFrom;
-const $$createType4 = $models.ProxyStatus.createFrom;
+const $$createType0 = $models.AccountView.createFrom;
+const $$createType1 = $Create.Array($$createType0);
+const $$createType2 = $models.LogEntry.createFrom;
+const $$createType3 = $Create.Array($$createType2);
+const $$createType4 = $models.SettingsView.createFrom;
+const $$createType5 = chatgptproxy$0.LoginResult.createFrom;
+const $$createType6 = $models.ProviderInfo.createFrom;
+const $$createType7 = $Create.Array($$createType6);
+const $$createType8 = $models.ProxyStatus.createFrom;
