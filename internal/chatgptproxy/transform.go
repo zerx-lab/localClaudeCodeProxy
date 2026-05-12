@@ -46,6 +46,8 @@ func ensureResponsesInstructions(body []byte) ([]byte, bool) {
 		}
 	}
 	enforceNoStore(parsed)
+	normalizeTools(parsed)
+	normalizeToolChoice(parsed)
 	stripCodexUnsupportedParams(parsed)
 	out, err := json.Marshal(parsed)
 	if err != nil {
@@ -109,6 +111,8 @@ func normalizeChatCompletions(body []byte) ([]byte, bool) {
 	}
 	next["input"] = input
 	enforceNoStore(next)
+	normalizeTools(next)
+	normalizeToolChoice(next)
 	stripCodexUnsupportedParams(next)
 
 	out, err := json.Marshal(next)
@@ -120,6 +124,7 @@ func normalizeChatCompletions(body []byte) ([]byte, bool) {
 
 func enforceNoStore(parsed map[string]any) {
 	parsed["store"] = false
+	normalizeInputContentTypes(parsed["input"])
 	stripInputItemIDs(parsed["input"])
 }
 
@@ -127,6 +132,17 @@ func stripCodexUnsupportedParams(parsed map[string]any) {
 	delete(parsed, "max_output_tokens")
 	delete(parsed, "max_tokens")
 	delete(parsed, "max_completion_tokens")
+	delete(parsed, "prompt_cache_retention")
+	stripSparkStreamOptions(parsed)
+}
+
+func stripSparkStreamOptions(parsed map[string]any) {
+	model := strings.ToLower(strings.TrimSpace(asString(parsed["model"])))
+	if !strings.Contains(model, "spark") {
+		return
+	}
+	delete(parsed, "stream_options")
+	delete(parsed, "temperature")
 }
 
 func stripInputItemIDs(input any) {
@@ -140,6 +156,123 @@ func stripInputItemIDs(input any) {
 			continue
 		}
 		delete(msg, "id")
+	}
+}
+
+func normalizeInputContentTypes(input any) {
+	items, ok := input.([]any)
+	if !ok {
+		return
+	}
+	for _, item := range items {
+		msg, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		normalizeMessageContentTypes(msg)
+	}
+}
+
+func normalizeMessageContentTypes(msg map[string]any) {
+	content, ok := msg["content"].([]any)
+	if !ok {
+		return
+	}
+	role := asString(msg["role"])
+	for _, item := range content {
+		part, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		if asString(part["type"]) != "text" {
+			continue
+		}
+		if role == "assistant" {
+			part["type"] = "output_text"
+		} else {
+			part["type"] = "input_text"
+		}
+	}
+}
+
+func normalizeTools(parsed map[string]any) {
+	tools, ok := parsed["tools"].([]any)
+	if !ok {
+		return
+	}
+	for i, item := range tools {
+		tool, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		tools[i] = normalizeTool(tool)
+	}
+}
+
+func normalizeTool(tool map[string]any) map[string]any {
+	if asString(tool["type"]) == "" && strings.TrimSpace(asString(tool["name"])) != "" {
+		tool["type"] = "function"
+	}
+	if strings.TrimSpace(asString(tool["name"])) != "" {
+		if _, ok := tool["parameters"]; !ok {
+			if schema, ok := tool["input_schema"]; ok {
+				tool["parameters"] = schema
+				delete(tool, "input_schema")
+			}
+		}
+		return tool
+	}
+	fn, ok := tool["function"].(map[string]any)
+	if !ok {
+		return tool
+	}
+	next := make(map[string]any, len(tool)+len(fn))
+	for k, v := range tool {
+		if k == "function" {
+			continue
+		}
+		next[k] = v
+	}
+	next["type"] = "function"
+	promoteToolField(next, fn, "name")
+	promoteToolField(next, fn, "description")
+	promoteToolField(next, fn, "parameters")
+	promoteToolField(next, fn, "strict")
+	if _, ok := next["parameters"]; !ok {
+		promoteToolField(next, fn, "input_schema")
+		if schema, ok := next["input_schema"]; ok {
+			next["parameters"] = schema
+			delete(next, "input_schema")
+		}
+	}
+	return next
+}
+
+func promoteToolField(dst, src map[string]any, key string) {
+	if _, exists := dst[key]; exists {
+		return
+	}
+	if v, exists := src[key]; exists {
+		dst[key] = v
+	}
+}
+
+func normalizeToolChoice(parsed map[string]any) {
+	choice, ok := parsed["tool_choice"].(map[string]any)
+	if !ok {
+		return
+	}
+	if strings.TrimSpace(asString(choice["name"])) != "" {
+		return
+	}
+	fn, ok := choice["function"].(map[string]any)
+	if !ok {
+		return
+	}
+	if name := strings.TrimSpace(asString(fn["name"])); name != "" {
+		choice["type"] = "function"
+		choice["name"] = name
+		delete(choice, "function")
 	}
 }
 
