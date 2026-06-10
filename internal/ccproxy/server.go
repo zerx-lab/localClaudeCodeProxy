@@ -21,6 +21,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+
+	"localclaudecodeproxy/internal/netproxy"
 )
 
 const (
@@ -78,7 +80,7 @@ func NewServer(creds *CredentialManager, onLog LogFunc) *Server {
 		creds:         creds,
 		betas:         NewBetaExclusionStore(),
 		sessionID:     uuid.NewString(),
-		httpc:         &http.Client{Timeout: 0}, // 不设超时：流式响应可能持续很久
+		httpc:         netproxy.NewClient(0), // 不设超时：流式响应可能持续很久
 		onLog:         onLog,
 		maxRetryDelay: defaultMaxRetryDelay,
 	}

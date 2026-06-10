@@ -5,6 +5,7 @@ go 1.25
 require (
 	github.com/gin-gonic/gin v1.10.1
 	github.com/google/uuid v1.6.0
+	github.com/mattn/go-ieproxy v0.0.12
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
 	github.com/wailsapp/wails/v3 v3.0.0-alpha.78
 	golang.org/x/sys v0.40.0

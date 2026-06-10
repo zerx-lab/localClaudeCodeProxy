@@ -18,6 +18,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"localclaudecodeproxy/internal/netproxy"
 )
 
 // Anthropic 用于 Claude Code 客户端的 OAuth 端点 / client_id（参考 opencode-claude-auth）。
@@ -56,9 +58,7 @@ type CredentialManager struct {
 // NewCredentialManager 构造默认的凭证管理器。
 func NewCredentialManager() *CredentialManager {
 	return &CredentialManager{
-		httpClient: &http.Client{
-			Timeout: 15 * time.Second,
-		},
+		httpClient: netproxy.NewClient(15 * time.Second),
 	}
 }
 

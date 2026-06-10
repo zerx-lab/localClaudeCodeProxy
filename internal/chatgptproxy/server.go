@@ -17,6 +17,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+
+	"localclaudecodeproxy/internal/netproxy"
 )
 
 const (
@@ -53,7 +55,7 @@ func NewServer(creds *CredentialManager, onLog LogFunc) *Server {
 	return &Server{
 		creds:   creds,
 		session: uuid.NewString(),
-		httpc:   &http.Client{Timeout: 0},
+		httpc:   netproxy.NewClient(0),
 		onLog:   onLog,
 	}
 }

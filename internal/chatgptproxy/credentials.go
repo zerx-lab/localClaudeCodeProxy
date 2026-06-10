@@ -20,6 +20,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"localclaudecodeproxy/internal/netproxy"
 )
 
 const (
@@ -91,7 +93,7 @@ type CredentialManager struct {
 // NewCredentialManager 构造默认凭证管理器。
 func NewCredentialManager() *CredentialManager {
 	return &CredentialManager{
-		httpClient: &http.Client{Timeout: 20 * time.Second},
+		httpClient: netproxy.NewClient(20 * time.Second),
 	}
 }
 
