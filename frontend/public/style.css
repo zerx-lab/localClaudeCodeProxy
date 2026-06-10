@@ -76,6 +76,10 @@ body,
   height: 100vh;
   margin: 0;
   padding: 0;
+  /* 任何层都不允许出现文档级滚动：内容溢出时若文档可滚，
+     点击 <summary>/展开详情会触发 scroll-into-view 把整页顶走，
+     底部露出黑色空白（布局错乱）。滚动只允许发生在 .app / .log-pane。 */
+  overflow: hidden;
 }
 
 body {
@@ -209,6 +213,9 @@ body {
  */
 .app {
   flex: 1 1 auto;
+  /* flex 子项默认 min-height:auto（= 内容高），展开日志详情后内容变高
+     会让 .app 撑破 .root 导致文档溢出。必须显式归零才能让内部滚动生效。 */
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   display: flex;
@@ -883,9 +890,13 @@ code {
 }
 
 .log-detail-val--header {
+  flex: 1;
+  min-width: 0;
+  word-break: break-all;
   font-family:
     ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
   color: var(--fg-default);
+  user-select: text;
 }
 
 /* ── 请求体代码块 ── */

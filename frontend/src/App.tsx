@@ -49,6 +49,15 @@ const SECTION_ORDER = [
   "respBodyRaw",
 ];
 
+// 只有这些 section 是「键值对都是字符串」的 header 表，适合用表格渲染；
+// 其余 object（reqBody/respBody 等）必须走 JSON 美化输出，否则嵌套结构会被
+// String() 成 "[object Object]"。
+const HEADER_SECTIONS = new Set([
+  "inboundHeaders",
+  "upstreamReqHeaders",
+  "respHeaders",
+]);
+
 const BASIC_FIELDS_ORDER = [
   "provider",
   "method",
@@ -116,12 +125,24 @@ function sortByPreferred(
 
 function sectionSummary(name: string, value: unknown): string {
   if (value === null || value === undefined) return "";
-  if (name === "respEvents" && Array.isArray(value)) return `${value.length} 事件`;
-  if (typeof value === "object" && !Array.isArray(value)) {
+  if (name === "respEvents" && Array.isArray(value))
+    return `${value.length} 事件`;
+  if (
+    HEADER_SECTIONS.has(name) &&
+    typeof value === "object" &&
+    !Array.isArray(value)
+  ) {
     return `${Object.keys(value as object).length} 项`;
   }
   const text = typeof value === "string" ? value : JSON.stringify(value);
   return text ? `${text.length} chars` : "";
+}
+
+// 把任意值转成单行字符串展示，object/array 走 JSON 而不是 String()，
+// 避免出现 "[object Object]"。
+function formatScalar(value: unknown): string {
+  if (typeof value === "string") return value;
+  return JSON.stringify(value) ?? String(value);
 }
 
 function SectionContent({ name, value }: { name: string; value: unknown }) {
@@ -129,7 +150,8 @@ function SectionContent({ name, value }: { name: string; value: unknown }) {
     return <div className="log-detail-empty">(空)</div>;
   }
   if (name === "respEvents" && Array.isArray(value)) {
-    if (value.length === 0) return <div className="log-detail-empty">(无事件)</div>;
+    if (value.length === 0)
+      return <div className="log-detail-empty">(无事件)</div>;
     return (
       <div className="log-detail-events">
         {value.map((evt, i) => {
@@ -153,18 +175,23 @@ function SectionContent({ name, value }: { name: string; value: unknown }) {
       </div>
     );
   }
-  if (typeof value === "object" && !Array.isArray(value)) {
+  if (
+    HEADER_SECTIONS.has(name) &&
+    typeof value === "object" &&
+    !Array.isArray(value)
+  ) {
     const entries = Object.entries(value as Record<string, unknown>).sort(
       ([a], [b]) => a.localeCompare(b),
     );
-    if (entries.length === 0) return <div className="log-detail-empty">(空)</div>;
+    if (entries.length === 0)
+      return <div className="log-detail-empty">(空)</div>;
     return (
       <div className="log-detail-headers">
         {entries.map(([k, v]) => (
           <div key={k} className="log-detail-row log-detail-row--header">
             <span className="log-detail-key log-detail-key--header">{k}</span>
             <span className="log-detail-val log-detail-val--header">
-              {String(v)}
+              {formatScalar(v)}
             </span>
           </div>
         ))}
@@ -193,11 +220,7 @@ function LogDetailPanel({ fields }: { fields: Record<string, unknown> }) {
           {sortByPreferred(basicEntries, BASIC_FIELDS_ORDER).map(([k, v]) => (
             <div key={k} className="log-detail-row">
               <span className="log-detail-key">{k}</span>
-              <span className="log-detail-val">
-                {typeof v === "object" && v !== null
-                  ? JSON.stringify(v)
-                  : String(v)}
-              </span>
+              <span className="log-detail-val">{formatScalar(v)}</span>
             </div>
           ))}
         </div>
@@ -525,7 +548,9 @@ function App() {
               <div className="info-grid">
                 <div>
                   <label>凭证来源</label>
-                  <span>{activeAccount.sourceLabel || activeAccount.source || "—"}</span>
+                  <span>
+                    {activeAccount.sourceLabel || activeAccount.source || "—"}
+                  </span>
                 </div>
                 <div>
                   <label>认证类型</label>
@@ -567,7 +592,8 @@ function App() {
                   浏览器登录 ChatGPT
                 </button>
                 <span className="help">
-                  登录成功后写入本应用配置目录；若本机 Codex CLI 已登录，也会自动作为备用来源。
+                  登录成功后写入本应用配置目录；若本机 Codex CLI
+                  已登录，也会自动作为备用来源。
                 </span>
               </div>
             )}
